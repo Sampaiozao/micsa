@@ -1,0 +1,64 @@
+#include <Servo.h>
+
+#define BOTAO_B1 PC13
+Servo servo;
+
+int modo = 0;
+int angle = 10;  // Ponto de partida
+int step = 1;  // Direção do movimento (+1 ou -1)
+unsigned long ultimaTroca = 0;
+const int debounceDelay = 200; // Tempo para evitar bounce
+const int minAngle = 10;
+const int maxAngle = 180;
+const int pontoInicial = 10;  // Ponto inicial para o servo (modo 3)
+
+void setup() {
+    pinMode(BOTAO_B1, INPUT_PULLUP);
+    Serial.begin(115200);
+    servo.attach(7);
+    servo.write(angle);  // Define o ângulo inicial
+}
+
+void loop() {
+    verificarBotao();
+    if (modo != 3) {  // Se não for o modo 3, continua movendo o servo
+        moverServo();
+    } else {
+        // No modo 3, o servo fica parado no ponto inicial
+        servo.write(pontoInicial);
+    }
+}
+
+// Verifica se o botão foi pressionado e muda o modo
+void verificarBotao() {
+    static bool estadoAnterior = HIGH;
+    bool estadoAtual = digitalRead(BOTAO_B1);
+
+    if (estadoAnterior == HIGH && estadoAtual == LOW && (millis() - ultimaTroca) > debounceDelay) {
+        modo = (modo + 1) % 4; // Alterna entre 0, 1, 2 e 3
+        Serial.print("Modo atual: ");
+        Serial.println(modo);
+        ultimaTroca = millis(); // Atualiza tempo da última troca
+    }
+
+    estadoAnterior = estadoAtual;
+}
+
+// Mantém o servo se movendo como um limpador de para-brisa
+void moverServo() {
+    static unsigned long ultimaAtualizacao = 0;
+    int velocidades[] = {200, 100, 20, 999999};  // Velocidades dos modos (o último valor é só para o modo parado)
+
+    int velocidadeAtual = velocidades[modo];
+
+    if (millis() - ultimaAtualizacao > velocidadeAtual) {
+        angle += step;
+        servo.write(angle);
+        ultimaAtualizacao = millis();
+
+        // Inverte a direção se atingir os limites
+        if (angle >= maxAngle || angle <= minAngle) {
+            step = -step;
+        }
+    }
+}
