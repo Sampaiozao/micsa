@@ -1,62 +1,102 @@
 #include <Servo.h>
 
 #define BOTAO_B1 PC13
-Servo servo;
+#define sensorPin A0
+
+Servo servo1;
+Servo servo2;
 
 int modo = 0;
-int angle = 10;  // Ponto de partida
-int step = 1;  // Direção do movimento (+1 ou -1)
+int angle = 51;  
+int step = 1;  
 unsigned long ultimaTroca = 0;
-const int debounceDelay = 200; // Tempo para evitar bounce
-const int minAngle = 10;
+const int debounceDelay = 200;
+const int minAngle = 50;
 const int maxAngle = 180;
-const int pontoInicial = 10;  // Ponto inicial para o servo (modo 3)
+const int pontoInicial = 51;
+
+// Velocidades para cada modo
+int velocidades[] = {999999, 15, 6, 1};  
 
 void setup() {
     pinMode(BOTAO_B1, INPUT_PULLUP);
-    Serial.begin(115200);
-    servo.attach(7);
-    servo.write(angle);  // Define o ângulo inicial
+    
+    Serial.begin(115200);  
+
+    servo1.attach(7);
+    servo2.attach(4); 
+
+    servo1.write(angle);  
+    servo2.write(angle);
 }
 
 void loop() {
     verificarBotao();
-    if (modo != 3) {  // Se não for o modo 3, continua movendo o servo
+    verificarSensor();
+    
+    if (modo != 0) {  
         moverServo();
     } else {
-        // No modo 3, o servo fica parado no ponto inicial
-        servo.write(pontoInicial);
+        servo1.write(pontoInicial);
+        servo2.write(pontoInicial);
     }
 }
 
-// Verifica se o botão foi pressionado e muda o modo
+
+int readSensor() {
+    int sensorValue = analogRead(sensorPin);  
+    int outputValue = map(sensorValue, 0, 1023, 255, 0);  
+    return outputValue;  
+}
+
+
 void verificarBotao() {
     static bool estadoAnterior = HIGH;
     bool estadoAtual = digitalRead(BOTAO_B1);
 
     if (estadoAnterior == HIGH && estadoAtual == LOW && (millis() - ultimaTroca) > debounceDelay) {
-        modo = (modo + 1) % 4; // Alterna entre 0, 1, 2 e 3
-        Serial.print("Modo atual: ");
+        modo = (modo + 1) % 4;  
+        Serial.print("Modo alterado manualmente para: ");
         Serial.println(modo);
-        ultimaTroca = millis(); // Atualiza tempo da última troca
+        ultimaTroca = millis();
     }
 
     estadoAnterior = estadoAtual;
 }
 
-// Mantém o servo se movendo como um limpador de para-brisa
+
+void verificarSensor() {
+    int valorA0 = readSensor();
+    Serial.print("Leitura A0: ");
+    Serial.println(valorA0);
+
+    // Ajusta o modo conforme o sensor
+    if (valorA0 > 150) {
+        modo = 3;  
+    } else if (valorA0 > 100) {
+        modo = 2;  
+    } else if (valorA0 > 25) {
+        modo = 1;  
+    } else {
+        modo = 0;  
+    }
+
+    Serial.print("Modo atual: ");
+    Serial.println(modo);
+}
+
+// Movimenta os servos conforme o modo
 void moverServo() {
     static unsigned long ultimaAtualizacao = 0;
-    int velocidades[] = {200, 100, 20, 999999};  // Velocidades dos modos (o último valor é só para o modo parado)
-
-    int velocidadeAtual = velocidades[modo];
+    int velocidadeAtual = velocidades[modo];  
 
     if (millis() - ultimaAtualizacao > velocidadeAtual) {
         angle += step;
-        servo.write(angle);
+        servo1.write(angle);
+        servo2.write(angle);
         ultimaAtualizacao = millis();
 
-        // Inverte a direção se atingir os limites
+        
         if (angle >= maxAngle || angle <= minAngle) {
             step = -step;
         }
